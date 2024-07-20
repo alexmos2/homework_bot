@@ -26,7 +26,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.DEBUG,
 )
-last_error_message = ''
 
 HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
@@ -54,9 +53,7 @@ def send_message(bot, message):
     """Отправка сообщения в telegram бот."""
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-    except telebot.apihelper.ApiException:
-        logging.error('Ошибка отправки запроса в telegram')
-    except requests.RequestException:
+    except (telebot.apihelper.ApiException, requests.RequestException):
         logging.error('Ошибка отправки запроса в telegram')
     except Exception as error:
         message = f'Ошибка отправки сообщения: {error}'
@@ -110,16 +107,16 @@ def parse_status(homework):
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-def send_error_message(bot, message):
+def send_error_message(bot, message, last_error_message):
     """Отправка сообщения с ошибкой в логи и в telegram бот."""
-    global last_error_message
     logging.error(message)
     if message != last_error_message:
         send_message(bot, message)
         last_error_message = message
+    return last_error_message
 
 
-def main_logic(bot, timestamp):
+def main_logic(bot, timestamp, last_error_message):
     """Основная функция для зацикливания."""
     try:
         response = get_api_answer(timestamp)
@@ -131,7 +128,11 @@ def main_logic(bot, timestamp):
         else:
             logging.debug('Нет нового статуса')
     except Exception as error:
-        send_error_message(bot, f'Произошла следующая ошибка: {error}')
+        last_error_message = send_error_message(
+            bot, f'Произошла следующая ошибка: {error}',
+            last_error_message
+        )
+    return last_error_message
 
 
 def main():
@@ -140,11 +141,11 @@ def main():
     if not check_tokens():
         return
     timestamp = int(time.time())
-    main_logic(bot, timestamp)
+    last_error_message = ''
 
     while True:
+        last_error_message = main_logic(bot, timestamp, last_error_message)
         time.sleep(RETRY_PERIOD)
-        main_logic(bot, timestamp)
         timestamp = int(time.time())
 
 
