@@ -89,7 +89,7 @@ def check_response(response):
         raise KeyError('Нет ключа homeworks')
     if not isinstance(response['homeworks'], list):
         raise TypeError(
-            f'Тип ключа homeworks неправильный: {type(response['homeworks'])}'
+            f'Тип ключа homeworks неправильный: {type(response["homeworks"])}'
         )
 
 
